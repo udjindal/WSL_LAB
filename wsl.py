@@ -9,8 +9,10 @@ Config = configparser.ConfigParser()
 Config.read("config.ini")
 
 epsilon = 0.0001
+delta = 0.000000005
 
 #get database info from config file
+
 hostname = Config.get("nucleus","hostname")
 username = Config.get("nucleus","username")
 password = Config.get("nucleus","password")
@@ -25,21 +27,17 @@ def proficiency_in_sub(conn, sub):
     max_cit = 1;
     for i in range(len(items)):
         if items[i] is None:
-            ret[i] = 1
+            ret[i] = 0.0 + delta
         elif items[i] == "0.00-0.20":
-            ret[i] = 1
+            ret[i] = 0.2 + delta
         elif items[i] == "0.20-0.40":
-            ret[i] = 2
+            ret[i] = 0.4 + delta
         elif items[i] == "0.40-0.60":
-            ret[i] = 3
+            ret[i] = 0.6 + delta
         elif items[i] == "0.60-0.80":
-            ret[i] = 4
+            ret[i] = 0.8 + delta
         elif items[i] == "0.80-1.00":
-            ret[i] = 5
-        max_cit = max(ret[i], max_cit)
-    for i in range(len(ret)):
-        ret[i] /= max_cit*1.0
-    #print ret
+            ret[i] = 1 + delta
     return ret
 
 def place_holder_endorsements(n):
@@ -47,18 +45,16 @@ def place_holder_endorsements(n):
     for i in range(n):
         for j in range(n):
             endorsed_by[i][j] = random.randint(0,1)
-    #print endorsed_by
     return endorsed_by
 
 def place_holde_auth_seed(n):
     authority_seed = [0]*n
     max_cont = 1;
     for i in range(n):
-        authority_seed[i] = random.randint(1,10)
+        authority_seed[i] = random.randint(1,50)
         max_cont = max(max_cont, authority_seed[i]);
     for i in range(n):
         authority_seed[i] /= max_cont*1.0
-    #print authority_seed
     return authority_seed
 
 def auth_citi(conn, n, sub):
@@ -98,6 +94,7 @@ def auth_citi(conn, n, sub):
             max_change_c = max(max_change_c, abs(citizenship_new[i] - citizenship[i])/citizenship[i])
             authority[i] = authority_new[i]
             citizenship[i] = citizenship_new[i]
+
         percent_change = max(max_change_a, max_change_c)
 
         print percent_change
@@ -115,12 +112,12 @@ if __name__ == '__main__':
     users = [item[0] for item in cur.fetchall()]
     authority = []
     citizenship = []
+    proficiency = proficiency_in_sub(myConnection, sub)
     authority, citizenship = auth_citi(myConnection, n, sub)
     with open(csv_file, "w") as output:
         writer = csv.writer(output, lineterminator='\n')
-        writer.writerow(['user_id', 'subject_id', 'authority', 'citizenship'])
-
+        writer.writerow(['user_id', 'subject_id', 'authority', 'citizenship', 'proficiency'])
         for i in range(n):
-            writer.writerow([users[i], sub, authority[i], citizenship[i]])
+            writer.writerow([users[i], sub, authority[i], citizenship[i], proficiency[i]])
         print("You're done! Output written to auth_citi_score.csv")
     myConnection.close()
