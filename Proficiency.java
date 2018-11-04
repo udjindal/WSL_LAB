@@ -33,10 +33,10 @@ public class Proficiency {
         ResultSet rs = stmt.executeQuery(url);
         return rs;
     }
-    static ArrayList get_lscores(JSONArray C,ResultSet rs_all_user_sub,String user_id,double user_badge,Connection connection1) throws JSONException, SQLException {
+    static ArrayList get_lscores(JSONArray C,ResultSet rs_all_user_sub,String user_id,double user_badge,Connection connection1, ArrayList <String> allowed_competencies)  throws JSONException, SQLException {
         ArrayList lscores = new ArrayList();
         //Run a loop for each concept node earned by user,compute percentile and add it to lscores
-        for (int c = 0; c < C.length(); c++) {
+        for (int c = 0; c < C.length() && allowed_competencies.contains(C.getJSONObject(c).get("competency_id")); c++) {
             String current_status=(String) C.getJSONObject(c).get("status");
             if(current_status.equals("completed")){
                 String current_node = (String) C.getJSONObject(c).get("competency_id");
@@ -51,7 +51,7 @@ public class Proficiency {
                 ArrayList B = new ArrayList();
                 //get badge earned by user_id in current concept node c and store it in user_badge
                 JSONArray temp=C;
-                for (int t = 0; t < temp.length(); t++) {
+                for (int t = 0; t < temp.length() && allowed_competencies.contains(temp.getJSONObject(t).get("competency_id")); t++) {
                     String status=(String) temp.getJSONObject(t).getString("status");
                     if(status.equals("completed")) {
                         String t_node = (String) temp.getJSONObject(t).getString("competency_id");
@@ -70,7 +70,7 @@ public class Proficiency {
                 int Blc_base = 0;
                 while (rs2.next()) {
                     JSONArray temp2 = new JSONArray(rs2.getString(1));
-                    for (int t = 0; t < temp2.length(); t++) {
+                    for (int t = 0; t < temp2.length() && allowed_competencies.contains(temp2.getJSONObject(t).get("competency_id")); t++) {
                         String temp_status = (String) temp2.getJSONObject(t).getString("status");
                         //if status is completed then only consider badge
                         if (temp_status.equals("completed")) {
@@ -151,7 +151,7 @@ public class Proficiency {
             myprof.put("badge","0.80-1.00");
         return myprof;
     }
-    static void set_proficiency(String learner_id, String subject_id,JSONObject proficiency) throws SQLException, JSONException {
+    static void set_proficiency(String learner_id, String subject_id,JSONObject proficiency, ArrayList<String> grade_domain) throws SQLException, JSONException {
         //connect to nucleus database deepend_lbt
         //Connection connection=Proficiency.getConnection("jdbc:postgresql://localhost:5432/postgres","postgres", "complicated");
 	    Connection connection = DriverManager.getConnection("jdbc:postgresql://postgres-nucleusdb.internal.gooru.org/nucleus","goorulabs", "Maxmin123");
@@ -159,7 +159,8 @@ public class Proficiency {
             Statement stmt = connection.createStatement();
             //update proficiency of learner
             String url = "update deepend_lbt set proficiency='" + proficiency + "' where user_id='" + learner_id + "' and subject_id='"+subject_id+"'";
-            stmt.executeUpdate(url);
+            System.out.println(grade_domain.get(0) + " " + grade_domain.get(1) + " " + proficiency + "\n");
+            //stmt.executeUpdate(url);
         }
     }
     static JSONObject get_proficiency(String learner_id,String subject_id) throws SQLException, JSONException {
@@ -191,12 +192,27 @@ public class Proficiency {
             JSONObject badge=new JSONObject();
 
             //get comptency_list of user in subject
-            ResultSet grade_domain_competencies = Proficiency.getResultSet_Execute("select learning_map from deepend_lmbt where subject_id'" + subject_id + "''" ,connection1);
+            ResultSet learning_map = Proficiency.getResultSet_Execute("select learning_map from deepend_lmbt where subject_id'" + subject_id + "''" ,connection1);
+            JSONArray learning_map_data = new JSONArray(learning_map.getString(1));
+            HashMap<ArrayList<String>, ArrayList<String> > grade_domain_mapping = new HashMap<ArrayList<String>, ArrayList<String> > ();
+            for (int i = 0; i < learning_map_data.length(); i++) {
+                JSONObject competency = learning_map_data.getJSONObject(i);
+                ArrayList<String> keyStr = new ArrayList<String>();
+                keyStr.add(competency.getString("tx_course_code"));
+                keyStr.add(competency.getString("tx_domain_code"));
+                ArrayList<String> valueArr = new ArrayList<String>();
 
+                if (grade_domain_mapping.containsKey(keyStr)) {
+                    valueArr = grade_domain_mapping.get(keyStr);
+                }
+                valueArr.add(competency.getString("tx_comp_code"));
+                grade_domain_mapping.put(keyStr, valueArr);
+
+            }
             // ---- --- -----
 
             // Here we will have a map from grade domain to all competencies by calling GD_comp mapping function.
-            
+
             // --- - --- ----
 
 
@@ -217,15 +233,17 @@ public class Proficiency {
             }
             //initialise empty array lscores to store all percentile scores earned by user_id
             ArrayList lscores=new ArrayList();
-            lscores=Proficiency.get_lscores(C,rs_all_user_sub,user_id,user_badge,connection1);
-            //reinitailse resultset to first row and get badge of user
-            rs_all_user_sub.beforeFirst();
-            if(!lscores.isEmpty()) {
-                badge = Proficiency.getBadge(lscores, rs_all_user_sub);
-                set_proficiency(user_id,subject_id,badge);
-            }
-            else{
-                System.out.println("badge is null");
+            for (ArrayList<String> key : grade_domain_mapping.keySet()) {
+                lscores=Proficiency.get_lscores(C,rs_all_user_sub,user_id,user_badge,connection1, grade_domain_mapping.get(key));
+                //reinitailse resultset to first row and get badge of user
+                rs_all_user_sub.beforeFirst();
+                if(!lscores.isEmpty()) {
+                    badge = Proficiency.getBadge(lscores, rs_all_user_sub);
+                    set_proficiency(user_id,subject_id,badge, key);
+                }
+                else{
+                    System.out.println("badge is null");
+                }
             }
             // loop ends here.
         }
