@@ -1,6 +1,7 @@
 import java.sql.*;
 import java.util.*;
 import org.json.*;
+import org.postgresql.Driver;
 /**
  *
  * @author shivam
@@ -154,7 +155,7 @@ public class Proficiency {
     static void set_proficiency(String learner_id, String subject_id,JSONObject proficiency, ArrayList<String> grade_domain) throws SQLException, JSONException {
         //connect to nucleus database deepend_lbt
         //Connection connection=Proficiency.getConnection("jdbc:postgresql://localhost:5432/postgres","postgres", "complicated");
-	    Connection connection = DriverManager.getConnection("jdbc:postgresql://postgres-nucleusdb.internal.gooru.org/nucleus","goorulabs", "Maxmin123");
+	    Connection connection = Proficiency.getConnection("jdbc:postgresql://postgres-nucleusdb.internal.gooru.org/nucleus","goorulabs", "Maxmin123");
         if(connection!=null){
             Statement stmt = connection.createStatement();
             //update proficiency of learner
@@ -166,7 +167,7 @@ public class Proficiency {
     static JSONObject get_proficiency(String learner_id,String subject_id) throws SQLException, JSONException {
         //connect to nucleus database deepend_lbt
         //Connection connection=Proficiency.getConnection("jdbc:postgresql://localhost:5432/postgres","postgres", "complicated");
-	    Connection connection = DriverManager.getConnection("jdbc:postgresql://postgres-nucleusdb.internal.gooru.org/nucleus","goorulabs", "Maxmin123");
+	    Connection connection = Proficiency.getConnection("jdbc:postgresql://postgres-nucleusdb.internal.gooru.org/nucleus","goorulabs", "Maxmin123");
         if (connection != null) {
             //get proficiency of learner and return it
             PreparedStatement pstmt1 = connection.prepareStatement("select proficiency from deepend_lbt where user_id='" + learner_id + "' and subject_id='"+subject_id+"'");
@@ -223,7 +224,7 @@ public class Proficiency {
             ResultSet rs_all_user_sub = Proficiency.getResultSet_Execute("select progress->'competency_list' from deepend_lbt where subject_id='"+subject_id + "'",connection1);
 
 
-            // whole calculattion will remain same.
+            // whole calculation will remain same.
 
             JSONObject obj=null;
             JSONArray C = null;

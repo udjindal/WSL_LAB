@@ -21,9 +21,9 @@ password = Config.get("nucleus","password")
 database = Config.get("nucleus","database")
 
 #Return a list of proficiency value of each user.
-def proficiency_in_sub(conn, sub):
+def proficiency_in_sub(conn, sub, grade_domain):
     cur = myConnection.cursor()
-    cur.execute("select proficiency->'badge' from deepend_lbt where subject_id = '{}'".format(sub))
+    cur.execute("select proficiency->'{}' from deepend_lbt where subject_id = '{}'".format(grade_domain, sub))
     items = [item[0] for item in cur.fetchall()]
     ret = [0]*len(items)
     max_cit = 1;
@@ -64,11 +64,11 @@ def place_holde_auth_seed(n):
     return authority_seed
 
 #Main function to calculate final authority andcitizen score using HITS dual relation algorithm.
-def auth_citi(conn, n, sub):
+def auth_citi(conn, n, grade_domain, sub):
     percent_change = 10000;
     endorsement_mat = place_holder_endorsements(n)
     authority = place_holde_auth_seed(n)
-    citizenship = proficiency_in_sub(conn, sub)
+    citizenship = proficiency_in_sub(conn, grade_domain, sub)
 
     #this loop will terminate when max change occured in the last iteration was less than the above defined epsilon.
     while(percent_change > epsilon):
@@ -119,7 +119,7 @@ if __name__ == '__main__':
 
     #For now code is for english subject
     sub = 'K12.ELA'
-    
+
     csv_file = "auth_citi_score.csv"
     cur = myConnection.cursor()
     cur.execute("select count(*) from deepend_lbt where subject_id = '{}'".format(sub))
@@ -128,14 +128,16 @@ if __name__ == '__main__':
     users = [item[0] for item in cur.fetchall()]
     authority = []
     citizenship = []
-    proficiency = proficiency_in_sub(myConnection, sub)
 
-    #for multiple subject we will put a loop for all subjects here.
-    authority, citizenship = auth_citi(myConnection, n, sub)
-    with open(csv_file, "w") as output:
-        writer = csv.writer(output, lineterminator='\n')
-        writer.writerow(['user_id', 'subject_id', 'authority', 'citizenship', 'proficiency'])
-        for i in range(n):
-            writer.writerow([users[i], sub, authority[i], citizenship[i], proficiency[i]])
-        print("You're done! Output written to auth_citi_score.csv")
+    cur.execute("select proficiency from deepend_lbt where subject_id = '{}'".format(sub))
+    gradeDomainData = cur.fetchall()[0]
+    for key in gradeDomainData:
+        #for multiple subject we will put a loop for all subjects here.
+        authority, citizenship = auth_citi(myConnection, n, key, sub)
+        with open(csv_file, "w") as output:
+            writer = csv.writer(output, lineterminator='\n')
+            writer.writerow(['user_id', 'subject_id', 'grade_domain', 'authority', 'citizenship', 'proficiency'])
+            for i in range(n):
+                writer.writerow([users[i], sub, key, authority[i], citizenship[i], proficiency[i]])
+            print("You're done! Output written to auth_citi_score.csv")
     myConnection.close()
