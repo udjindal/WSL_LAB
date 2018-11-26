@@ -37,73 +37,81 @@ public class Proficiency {
     static ArrayList get_lscores(JSONArray C,ResultSet rs_all_user_sub,String user_id,double user_badge,Connection connection1, ArrayList <String> allowed_competencies)  throws JSONException, SQLException {
         ArrayList lscores = new ArrayList();
         //Run a loop for each concept node earned by user,compute percentile and add it to lscores
-        for (int c = 0; c < C.length() && allowed_competencies.contains(C.getJSONObject(c).get("competency_id")); c++) {
-            String current_status=(String) C.getJSONObject(c).get("status");
-            if(current_status.equals("completed")){
-                String current_node = (String) C.getJSONObject(c).get("competency_id");
-                //create empty hashtable badges
-                HashMap<String, Integer> badges = new HashMap<String, Integer>();
-                badges.put("0.20", 0);
-                badges.put("0.40", 0);
-                badges.put("0.60", 0);
-                badges.put("0.80", 0);
-                badges.put("1.00", 0);
-                //create empty list to hold all badges earned by any learner in c
-                ArrayList B = new ArrayList();
-                //get badge earned by user_id in current concept node c and store it in user_badge
-                JSONArray temp=C;
-                for (int t = 0; t < temp.length() && allowed_competencies.contains(temp.getJSONObject(t).get("competency_id")); t++) {
-                    String status=(String) temp.getJSONObject(t).getString("status");
-                    if(status.equals("completed")) {
-                        String t_node = (String) temp.getJSONObject(t).getString("competency_id");
-                        String t_badge = (String) temp.getJSONObject(t).getString("badge");
-                        if (t_node.equals(current_node)) {
-                            String[] tok = t_badge.split("-", 2);
-                            String t_badge_split = tok[1];
-                            //this stores user_badge in competency c and break this loop
-                            user_badge = Double.parseDouble(t_badge_split);
-                            break;
-                        }
-                    }
-                }
-                ResultSet rs2 = rs_all_user_sub;
-                rs2.beforeFirst();
-                int Blc_base = 0;
-                while (rs2.next()) {
-                    JSONArray temp2 = new JSONArray(rs2.getString(1));
-                    for (int t = 0; t < temp2.length() && allowed_competencies.contains(temp2.getJSONObject(t).get("competency_id")); t++) {
-                        String temp_status = (String) temp2.getJSONObject(t).getString("status");
-                        //if status is completed then only consider badge
-                        if (temp_status.equals("completed")) {
-                            String t_node = (String) temp2.getJSONObject(t).getString("competency_id");
-                            String t_badge = (String) temp2.getJSONObject(t).getString("badge");
-                            if (t_node.equals(current_node)) {
-                                String[] tok = t_badge.split("-", 2);
-                                String t_badge_split = tok[1];
-                                int val = badges.get(t_badge_split);
-                                val++;
-                                badges.put(t_badge_split, val);
-                            }
-                        }
-                    }
-                }
-                if (user_badge >= 0.2)
-                    Blc_base = Blc_base + badges.get("0.20");
-                if (user_badge >= 0.4)
-                    Blc_base = Blc_base + badges.get("0.40");
-                if (user_badge >= 0.6)
-                    Blc_base = Blc_base + badges.get("0.60");
-                if (user_badge >= 0.8)
-                    Blc_base = Blc_base + badges.get("0.80");
-                if (user_badge == 1.0)
-                    Blc_base = Blc_base + badges.get("1.00");
+        for (int c = 0; c < C.length(); c++) {
 
-                int Badges_in_c = badges.get("0.20") + badges.get("0.40") + badges.get("0.60") + badges.get("0.80") + badges.get("1.00");
-                double percentile = (Blc_base * 100) / Badges_in_c;
-                lscores.add(percentile);
+        	if(allowed_competencies.contains((String)C.getJSONObject(c).get("competency_id"))) {
 
-            }
+	            String current_status=(String) C.getJSONObject(c).get("status");
+	            if(current_status.equals("completed")){
+	            	//System.out.println( ((String) C.getJSONObject(c).get("competency_id")) + '\n');
+	                String current_node = (String) C.getJSONObject(c).get("competency_id");
+	                //create empty hashtable badges
+	                HashMap<String, Integer> badges = new HashMap<String, Integer>();
+	                badges.put("0.20", 0);
+	                badges.put("0.40", 0);
+	                badges.put("0.60", 0);
+	                badges.put("0.80", 0);
+	                badges.put("1.00", 0);
+	                //create empty list to hold all badges earned by any learner in c
+	                ArrayList B = new ArrayList();
+	                //get badge earned by user_id in current concept node c and store it in user_badge
+	                JSONArray temp=C;
+	                for (int t = 0; t < temp.length(); t++) {
+	                	if(allowed_competencies.contains( (String)temp.getJSONObject(t).get("competency_id") )) {
+		                    String status=(String) temp.getJSONObject(t).getString("status");
+		                    if(status.equals("completed")) {
+		                        String t_node = (String) temp.getJSONObject(t).getString("competency_id");
+		                        String t_badge = (String) temp.getJSONObject(t).getString("badge");
+		                        if (t_node.equals(current_node)) {
+		                            String[] tok = t_badge.split("-", 2);
+		                            String t_badge_split = tok[1];
+		                            //this stores user_badge in competency c and break this loop
+		                            user_badge = Double.parseDouble(t_badge_split);
+		                            break;
+		                        }
+		                    }
+	                	}
+	                }
+	                ResultSet rs2 = rs_all_user_sub;
+	                rs2.beforeFirst();
+	                int Blc_base = 0;
+	                while (rs2.next()) {
+	                    JSONArray temp2 = new JSONArray(rs2.getString(1));
+	                    for (int t = 0; t < temp2.length(); t++) {
+	                    	if(allowed_competencies.contains( (String)temp2.getJSONObject(t).get("competency_id"))) {
+		                        String temp_status = (String) temp2.getJSONObject(t).getString("status");
+		                        //if status is completed then only consider badge
+		                        if (temp_status.equals("completed")) {
+		                            String t_node = (String) temp2.getJSONObject(t).getString("competency_id");
+		                            String t_badge = (String) temp2.getJSONObject(t).getString("badge");
+		                            if (t_node.equals(current_node)) {
+		                                String[] tok = t_badge.split("-", 2);
+		                                String t_badge_split = tok[1];
+		                                int val = badges.get(t_badge_split);
+		                                val++;
+		                                badges.put(t_badge_split, val);
+		                            }
+		                        }
+	                    	}
+	                    }
+	                }
+	                if (user_badge >= 0.2)
+	                    Blc_base = Blc_base + badges.get("0.20");
+	                if (user_badge >= 0.4)
+	                    Blc_base = Blc_base + badges.get("0.40");
+	                if (user_badge >= 0.6)
+	                    Blc_base = Blc_base + badges.get("0.60");
+	                if (user_badge >= 0.8)
+	                    Blc_base = Blc_base + badges.get("0.80");
+	                if (user_badge == 1.0)
+	                    Blc_base = Blc_base + badges.get("1.00");
 
+	                int Badges_in_c = badges.get("0.20") + badges.get("0.40") + badges.get("0.60") + badges.get("0.80") + badges.get("1.00");
+	                double percentile = (Blc_base * 100) / Badges_in_c;
+	                lscores.add(percentile);
+
+	            }
+        	}
 
         }//for c in C loop ends here
         return lscores;
@@ -152,7 +160,7 @@ public class Proficiency {
             myprof.put("badge","0.80-1.00");
         return myprof;
     }
-    static void set_proficiency(String learner_id, String subject_id,JSONObject proficiency, ArrayList<String> grade_domain) throws SQLException, JSONException {
+    static void set_proficiency(String learner_id, String subject_id,JSONObject proficiency) throws SQLException, JSONException {
         //connect to nucleus database deepend_lbt
         //Connection connection=Proficiency.getConnection("jdbc:postgresql://localhost:5432/postgres","postgres", "complicated");
 	    Connection connection = Proficiency.getConnection("jdbc:postgresql://postgres-nucleusdb.internal.gooru.org/nucleus","goorulabs", "Maxmin123");
@@ -160,7 +168,6 @@ public class Proficiency {
             Statement stmt = connection.createStatement();
             //update proficiency of learner
             String url = "update deepend_lbt set proficiency='" + proficiency + "' where user_id='" + learner_id + "' and subject_id='"+subject_id+"'";
-            System.out.println(grade_domain.get(0) + " " + grade_domain.get(1) + " " + proficiency + "\n");
             //stmt.executeUpdate(url);
         }
     }
@@ -193,7 +200,9 @@ public class Proficiency {
             JSONObject badge=new JSONObject();
 
             //get comptency_list of user in subject
-            ResultSet learning_map = Proficiency.getResultSet_Execute("select learning_map from deepend_lmbt where subject_id'" + subject_id + "''" ,connection1);
+            ResultSet learning_map = Proficiency.getResultSet_Execute("select learning_map from deepend_lmbt where learningmap_id = '" + subject_id + "'" ,connection1);
+            learning_map.next();
+            //System.out.println(learning_map.getString(1));
             JSONArray learning_map_data = new JSONArray(learning_map.getString(1));
             HashMap<ArrayList<String>, ArrayList<String> > grade_domain_mapping = new HashMap<ArrayList<String>, ArrayList<String> > ();
             for (int i = 0; i < learning_map_data.length(); i++) {
@@ -234,18 +243,25 @@ public class Proficiency {
             }
             //initialise empty array lscores to store all percentile scores earned by user_id
             ArrayList lscores=new ArrayList();
+            JSONObject proficiency=new JSONObject();
             for (ArrayList<String> key : grade_domain_mapping.keySet()) {
                 lscores=Proficiency.get_lscores(C,rs_all_user_sub,user_id,user_badge,connection1, grade_domain_mapping.get(key));
                 //reinitailse resultset to first row and get badge of user
                 rs_all_user_sub.beforeFirst();
+                String s = key.get(0) + "_" + key.get(1);
                 if(!lscores.isEmpty()) {
                     badge = Proficiency.getBadge(lscores, rs_all_user_sub);
-                    set_proficiency(user_id,subject_id,badge, key);
                 }
                 else{
-                    System.out.println("badge is null");
+                    //System.out.println(s +  " " + "badge is null");
+                    proficiency.put(s, "NA");
+                    continue;
                 }
+                //String s = key.get(0) + "_" + key.get(1);
+                proficiency.put(s, badge.get("badge"));
             }
+            set_proficiency(user_id,subject_id,proficiency);
+            System.out.println(proficiency);
             // loop ends here.
         }
         connection1.close();
