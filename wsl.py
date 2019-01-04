@@ -1,3 +1,4 @@
+
 import psycopg2
 import csv
 import configparser
@@ -15,31 +16,34 @@ epsilon = 0.0001
 delta = 0.000000005
 
 #get database info from config file
-hostname = Config.get("nucleus","hostname")
-username = Config.get("nucleus","username")
-password = Config.get("nucleus","password")
-database = Config.get("nucleus","database")
+# hostname = Config.get("nucleus","hostname")
+# username = Config.get("nucleus","username")
+# password = Config.get("nucleus","password")
+# database = Config.get("nucleus","database")
 
 #Return a list of proficiency value of each user.
 def proficiency_in_sub(conn, sub, grade_domain):
     cur = myConnection.cursor()
-    cur.execute("select proficiency->'{}' from deepend_lbt where subject_id = '{}'".format(grade_domain, sub))
+    cur.execute("select proficiency from deepend_lbt where subject_id = '{}'".format( sub))
     items = [item[0] for item in cur.fetchall()]
-    ret = [0]*len(items)
+    ret = [0+delta]*len(items)
     max_cit = 1;
     #If the badge is null that means the user has not attempted any assesment yet.
+    #return ret
     for i in range(len(items)):
-        if items[i] is None:
+        if items[i][str(grade_domain)] is "NA":
             ret[i] = 0.0 + delta
-        elif items[i] == "0.00-0.20":
+        elif items[i][str(grade_domain)] is None:
+            ret[i] = 0.0 + delta
+        elif items[i][str(grade_domain)] == "0.00-0.20":
             ret[i] = 0.2 + delta
-        elif items[i] == "0.20-0.40":
+        elif items[i][str(grade_domain)] == "0.20-0.40":
             ret[i] = 0.4 + delta
-        elif items[i] == "0.40-0.60":
+        elif items[i][str(grade_domain)] == "0.40-0.60":
             ret[i] = 0.6 + delta
-        elif items[i] == "0.60-0.80":
+        elif items[i][str(grade_domain)] == "0.60-0.80":
             ret[i] = 0.8 + delta
-        elif items[i] == "0.80-1.00":
+        elif items[i][str(grade_domain)] == "0.80-1.00":
             ret[i] = 1 + delta
     return ret
 
@@ -68,7 +72,7 @@ def auth_citi(conn, n, grade_domain, sub):
     percent_change = 10000;
     endorsement_mat = place_holder_endorsements(n)
     authority = place_holde_auth_seed(n)
-    citizenship = proficiency_in_sub(conn, grade_domain, sub)
+    citizenship = proficiency_in_sub(conn, sub, grade_domain)
 
     #this loop will terminate when max change occured in the last iteration was less than the above defined epsilon.
     while(percent_change > epsilon):
@@ -115,29 +119,41 @@ def auth_citi(conn, n, grade_domain, sub):
 
 
 if __name__ == '__main__':
-    myConnection = psycopg2.connect( host=hostname, user=username, password = password,  dbname=database)
+    myConnection = psycopg2.connect( host="postgres-nucleusdb.internal.gooru.org", user="goorulabs", password = "Maxmin123",  dbname="nucleus")
 
     #For now code is for english subject
-    sub = 'K12.ELA'
-
-    csv_file = "auth_citi_score.csv"
+    #sub = 'K12.ELA'
     cur = myConnection.cursor()
-    cur.execute("select count(*) from deepend_lbt where subject_id = '{}'".format(sub))
-    n = int(cur.fetchall()[0][0])
-    cur.execute("select user_id from deepend_lbt where subject_id = '{}'".format(sub))
-    users = [item[0] for item in cur.fetchall()]
-    authority = []
-    citizenship = []
+    cur.execute("select subject_id from deepend_lbt")
+    subjects = [item[0] for item in cur.fetchall()]
+    csv_file = "auth_citi_score.csv"
 
-    cur.execute("select proficiency from deepend_lbt where subject_id = '{}'".format(sub))
-    gradeDomainData = cur.fetchall()[0]
-    for key in gradeDomainData:
-        #for multiple subject we will put a loop for all subjects here.
-        authority, citizenship = auth_citi(myConnection, n, key, sub)
-        with open(csv_file, "w") as output:
-            writer = csv.writer(output, lineterminator='\n')
-            writer.writerow(['user_id', 'subject_id', 'grade_domain', 'authority', 'citizenship', 'proficiency'])
+    for sub in subjects:
+        cur.execute("select count(*) from deepend_lbt where subject_id = '{}'".format(sub))
+        n = int(cur.fetchall()[0][0])
+        cur.execute("select user_id from deepend_lbt where subject_id = '{}'".format(sub))
+        users = [item[0] for item in cur.fetchall()]
+        authority = []
+        citizenship = []
+        authority_ans = [{} for _ in range(n)]
+        citizenship_ans = [{} for _ in range(n)]
+        #print authority_ans
+        cur.execute("select proficiency from deepend_lbt where subject_id = '{}' limit 1".format(sub))
+        gradeDomainData = cur.fetchall()[0][0]
+        print gradeDomainData
+        for key in gradeDomainData:
+            #for multiple subject we will put a loop for all subjects here.
+            authority, citizenship = auth_citi(myConnection, n, key, sub)
+            #print key
             for i in range(n):
-                writer.writerow([users[i], sub, key, authority[i], citizenship[i], proficiency[i]])
-            print("You're done! Output written to auth_citi_score.csv")
+                authority_ans[i][str(key)] = authority[i]
+                citizenship_ans[i][str(key)] = citizenship[i]
+            print authority_ans[0]
+        for i in range(n):
+            cur.execute("update deepend_lbt set authority = '{}' where user_id= '{}' and subject_id= '{}'".format(str(authority_ans[i]).replace("'", "\""), users[i], sub))
+            cur.execute("update deepend_lbt set citizenship = '{}' where user_id='{}' and subject_id= '{}'".format(str(citizenship_ans[i]).replace("'", "\""), users[i], sub))
+            myConnection.commit()
+            #print str(authority_ans[i]).replace("'", "\""), users[i], sub
+        #print authority, citizenship
+    print("You're done! Output written to auth_citi_score.csv")
     myConnection.close()
